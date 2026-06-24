@@ -48,6 +48,11 @@
         return m_score;
     }
     void CStudent::setScore(const CScore& score){
+    if (score.performance < 0 || score.performance > 100 ||
+        score.exam < 0 || score.exam > 100 ||
+        score.practice < 0 || score.practice > 100) {
+        return;
+    }
         m_score = score;
     }
 
@@ -73,7 +78,7 @@
     }
 
     bool CStudent::isNormal() const{
-        return m_examStatus.empty() || m_examStatus == "初修";
+        return m_examStatus.empty();            //判断状态是否为空
     }
     bool CStudent::hasOJRecord() const{
         return m_ojSolved>=0;

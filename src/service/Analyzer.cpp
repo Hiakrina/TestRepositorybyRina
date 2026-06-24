@@ -1,10 +1,11 @@
 #include "service/Analyzer.h"
 
-std::vector<CStudent> Analyzer::getInsufficientSolved(const std::vector<CStudent>& students,int minSolved) const{
+std::vector<CStudent> Analyzer::getInsufficientSolved(const std::vector<CStudent>& students,int totalProblems) const{
     std::vector<CStudent> result;
     for(int i = 0;i < students.size();i++){
         if(students[i].hasOJRecord()){
-            if (students[i].getOJSolved() < minSolved){
+            double ratio = static_cast<double>(students[i].getOJSolved()) / totalProblems;
+            if (ratio < 0.6){
                 result.push_back(students[i]);
             }
         }
@@ -59,12 +60,18 @@ std::vector<CStudent*> Analyzer::findByClass(std::vector<CStudent>& students, co
     std::vector<CStudent*> result;
     for(int i = 0;i<students.size();i++){
         if(students[i].getClassAfter() == Name || students[i].getClassBefore() == Name){
+        //这里本来想直接用after的数据，（代码给ai润色过后）考虑到有可能分班之后班级没有就增加了原班级查找了  
             result.push_back(&students[i]);
         }
     }
     return result;
 }
 bool Analyzer::modifyScore(CStudent& student, const CScore& newScore, const AuthManager& auth){
+        if (newScore.performance < 0 || newScore.performance > 100 ||
+        newScore.exam < 0 || newScore.exam > 100 ||
+        newScore.practice < 0 || newScore.practice > 100) {
+        return false;
+    }
         if (auth.ChangeOnesScore(student)){
         student.setScore(newScore);
         return true;
@@ -82,8 +89,10 @@ std::vector<CStudent> Analyzer::getNormalStudents(const std::vector<CStudent>& a
     std::vector<CStudent> result;
     for (int i = 0; i < all.size(); i++) {
         if (!all[i].isExcluded() && all[i].isNormal()) {
+        /*isExcluded 是手动标记，可能漏掉缓考/旷考等未标记但状态异常的学生；
+        isNormal 直接看 examStatus 是否为空*/
             result.push_back(all[i]);
         }
     }
     return result;
-}                        
+}      

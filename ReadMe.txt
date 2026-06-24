@@ -82,16 +82,20 @@
 
   5. OJ 系统分析
        过题不足的学生 / 不在 OJ 中的学生 / OJ 中的独立学号
+       学生用户自动使用默认阈值40，教师/管理员可自定义阈值
 
   6. 交互式查找与修改
        按学号/姓名/班级查找 -> 修改成绩/班级 -> 自动重算总评
+       位于修改-可视化-扩充主循环中，数据扩充后自动回到此处
+       扩充后首次进入修改时，自动展示新增学生数据以供参考
 
   7. 数据可视化（libxlsxwriter）
        分数段分布饼图 + 班级平均分对比柱状图
 
-  8. 数据扩充
+  8. 数据扩充（NEW）
        基于现有学生统计分布生成模拟数据，扩充至 100 人
        考试状态（初修/重修/缓考）按比例随机分配
+       扩充后自动返回修改界面，允许对新数据继续编辑
 
   9. 保存导出
        成绩总表导出为 Excel（只有"成绩总表"一个标签页）
@@ -260,28 +264,55 @@ ExamStatisticsSystem_v1.0/
 五、运行说明
 ================================================================================
 
-【命令行运行】
+【从 Release 下载使用（推荐普通用户）】
+
+  1. 从 GitHub Releases 页面下载 ExamStatisticsSystem_v1.0_Release.zip
+  2. 解压到任意目录，得到以下文件：
+
+     ExamStatisticsSystem.exe          主程序
+     libOpenXLSX.dll                   Excel 读写
+     libxlsxwriter.dll                 图表生成
+     libpugixml.dll                    XML 解析
+     libz.dll / libminiz.dll           压缩库
+     libminizip.dll                    ZIP 支持
+     libboost_nowide-gcc15-mt-x64-1_91.dll  Boost.Nowide
+     libstdc++-6.dll                   C++ 标准库（MinGW 运行时）
+     libgcc_s_seh-1.dll                GCC 运行时
+     libwinpthread-1.dll               POSIX 线程运行时
+     ReadMe.txt                        本说明文件
+
+  3. 将 4 个 Excel 数据文件放入 data/ 目录（首次运行会自动创建）：
+
+     data/
+     +-- Gen_CPP_Final_Exam_Results.xlsx   卷面成绩
+     +-- Gen_jxbcjd_zx.xlsx                总评成绩单
+     +-- Gen_OJTEST.xlsx                   OJ 刷题数据
+     +-- Gen_Performance_Scores.xlsx       平时成绩
+
+  4. 双击 ExamStatisticsSystem.exe 即可运行
+
+  5. 运行结果
+
+     控制台输出所有学生名单和 OJ 分析报告；
+     output/ 目录自动生成：
+
+       成绩总表_导出.xlsx      完整成绩汇总
+       分数段分布.xlsx         饼图（不及格/及格/中等/良好/优秀）
+       班级平均分对比.xlsx     柱状图（各班总评均分）
+
+【命令行运行（开发者/高级用户）】
 
   :: 默认路径（./data -> ./output）
   ExamStatisticsSystem.exe
 
-  :: 自定义路径
-  ExamStatisticsSystem.exe D:\myData D:\myOutput
 
-【分发给其他电脑】
+【系统要求】
 
-  需要打包的文件：
-    ExamStatisticsSystem.exe
-    OpenXLSX.dll
-    xlsxwriter.dll
-    pugixml.dll
-    miniz.dll
-    minizip.dll
-    z.dll
-    boost_nowide-*.dll
-    data/  （放入你的数据文件）
+  操作系统：Windows 10 / 11（64 位）
+  无需安装编程环境或 Visual C++ Redistributable，解压即用。
+  所有运行时依赖（MinGW GCC、C++ 标准库）已随包附带。
 
-  目标电脑需要安装：
+  Windows 7 / 8 用户需额外安装：
     Visual C++ Redistributable (https://aka.ms/vs/17/release/vc_redist.x64.exe)
 
 
@@ -342,7 +373,7 @@ ExamStatisticsSystem_v1.0/
           |
           +-- Auth (登录验证)
           |     |
-          |     +-- User 结构体数组（硬编码账号）
+          |     +-- User 结构体数组
           |
           +-- DataRepository (数据层)
           |     +-- loadAll() -> ExcelReader::readSheet()
@@ -365,7 +396,7 @@ ExamStatisticsSystem_v1.0/
           |
           +-- Expander (数据扩充)
           |     +-- generateID / generateName / generateScore
-          |     +-- generateExamStatus (按比例随机 初修/重修/缓考)
+          |     +-- generateExamStatus (按已有数据比例随机 初修/重修/缓考)
           |     +-- generateOJAccount / generateOJSolved
           |
           +-- saveData() -> DataRepository::saveScores()

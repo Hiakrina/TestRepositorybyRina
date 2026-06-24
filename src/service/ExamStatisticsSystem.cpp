@@ -369,7 +369,8 @@ void ExamStatisticsSystem::saveData(const std::string& outputPath)
 
 //系统主流程：按照拟定的顺序执行各个步骤
 //流程: 自动创建目录 → 用户登录 → 加载数据 → 成绩计算 → 名单排序 → OJ分析
-//       → 交互修改 → 可视化 → 数据扩充 → 保存导出
+//      → [循环: 交互修改(若已扩充则先展示新数据) → 可视化 → 数据扩充? → (若扩充则回到修改)] → 保存导出
+//学生用户OJ分析使用默认阈值40，教师和管理员可自定义阈值
 void ExamStatisticsSystem::run(const std::string& dataDir, const std::string& outputDir)
 {
     //0.自动创建所需目录（如不存在）
@@ -405,10 +406,12 @@ void ExamStatisticsSystem::run(const std::string& dataDir, const std::string& ou
         if (auth.login(username, passwd)) {
             loggedIn = true;
             const User* user = auth.currentUser();
-            const char* roleName[] = {"学生", "教师", "管理员"};
-            int roleIdx = static_cast<int>(user->role);
-            std::cout << "[登录成功] 欢迎 " << user->m_username
-                      << " (身份: " << roleName[roleIdx] << ")" << std::endl;
+            // 通过虚函数区分身份：学生 canViewAll=false，教师 canChangeAll=false，管理员均为 true
+            const char* roleName = "学生";
+            if (auth.CanChangeAll())      roleName = "管理员";
+            else if (auth.CanViewAll())   roleName = "教师";
+            std::cout << "[登录成功] 欢迎 " << user->username
+                      << " (身份: " << roleName << ")" << std::endl;
         } else {
             std::cout << "[登录失败] 用户名或密码错误，请重试" << std::endl;
         }
@@ -425,34 +428,62 @@ void ExamStatisticsSystem::run(const std::string& dataDir, const std::string& ou
         //默认按学号排序显示
         sortAndDisplay(0);
 
-        //5.OJ分析（用户可指定过题数阈值）
-        std::cout << "\n请输入OJ过题数阈值(低于此值为不足，默认40): ";
-        int threshold = 40;
-        std::string thresholdInput;
-        std::getline(std::cin, thresholdInput);
-        if (!thresholdInput.empty()) {
-            try { threshold = std::stoi(thresholdInput); }
-            catch (...) { threshold = 5; }
+        //5.OJ分析
+        //学生用户（canViewAll=false）直接使用默认阈值，教师和管理员可自定义阈值
+        int threshold = 40;   // 默认过题数阈值
+        if (!auth.CanViewAll()) {
+            std::cout << "\n[OJ分析] 使用默认过题阈值: " << threshold << std::endl;
+        } else {
+            std::cout << "\n请输入OJ过题数阈值(低于此值为不足，默认" << threshold << "): ";
+            std::string thresholdInput;
+            std::getline(std::cin, thresholdInput);
+            if (!thresholdInput.empty()) {
+                try { threshold = std::stoi(thresholdInput); }
+                catch (...) { threshold = 40; }
+            }
         }
         analyzeOJ(threshold);
 
-        //6.交互修改
-        std::cout << "\n是否进入交互修改模式? (1=是, 0=跳过): ";
-        std::string input;
-        std::getline(std::cin, input);
-        if (input == "1") {
-            findAndModify();
-        }
+        //6.交互修改（可循环：修改 → 可视化 → 扩充 → 返回修改）
+        //若数据已扩充，进入修改前先展示新增学生以供参考
+        bool continueMainLoop = true;
+        size_t countBeforeExpand = students.size();
+        while (continueMainLoop) {
+            std::cout << "\n是否进入交互修改模式? (1=是, 0=跳过): ";
+            std::string input;
+            std::getline(std::cin, input);
+            if (input == "1") {
+                // 数据扩充后首次进入修改时，先输出新增学生数据
+                if (students.size() > countBeforeExpand) {
+                    size_t newCount = students.size() - countBeforeExpand;
+                    std::cout << "\n--- 新增学生数据（供修改参考，共 "
+                              << newCount << " 人） ---" << std::endl;
+                    for (size_t i = countBeforeExpand; i < students.size(); ++i) {
+                        std::cout << "  [" << (i + 1) << "] ";
+                        displayStudent(students[i]);
+                    }
+                    std::cout << "----------------------------------------------" << std::endl;
+                    countBeforeExpand = students.size();   // 更新基准，避免重复显示
+                }
+                findAndModify();
+            }
 
-        //7.数据可视化
-        visualize(outputDir);
+            //7.数据可视化
+            visualize(outputDir);
 
-        //8.数据扩充
-        std::cout << "\n是否进行数据扩充? (1=是, 0=跳过): ";
-        std::string expandInput;
-        std::getline(std::cin, expandInput);
-        if (expandInput == "1") {
-            augmentData(100);
+            //8.数据扩充（扩充后返回修改界面，允许对新数据继续操作）
+            std::cout << "\n是否进行数据扩充? (1=是, 0=跳过, 直接保存): ";
+            std::string expandInput;
+            std::getline(std::cin, expandInput);
+            if (expandInput == "1") {
+                countBeforeExpand = students.size();   // 记录扩充前基准
+                augmentData(100);
+                std::cout << "\n[流程] 数据已扩充，新增 "
+                          << (students.size() - countBeforeExpand)
+                          << " 人，返回修改界面..." << std::endl;
+            } else {
+                continueMainLoop = false;   // 退出循环，进入保存
+            }
         }
 
         //9.保存导出
