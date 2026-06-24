@@ -52,7 +52,7 @@ std::vector<std::vector<std::string>> ExcelReader::readSheet(
                 case OpenXLSX::XLValueType::Float:
                     value = std::to_string(cell.value().get<double>());
                     //浮点数转为字符串，但可能包含小数部分
-                    //用DataRepository::SafeStoi解决
+                    //用DataRepository::safeStoi解决
                     break;
                 case OpenXLSX::XLValueType::Boolean:
                     value = cell.value().get<bool>() ? "TRUE" : "FALSE";

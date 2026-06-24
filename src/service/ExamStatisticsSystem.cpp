@@ -1,6 +1,7 @@
 #include "service/ExamStatisticsSystem.h"
 
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 #include <stdexcept>
 
@@ -144,7 +145,6 @@ void ExamStatisticsSystem::analyzeOJ(int threshold)
                   << "  姓名: " << stu.getName() << std::endl;
     }
 
-    //3.OJ中有但学生名单中没有的学号（需要外部提供allOJIds；此处暂从学生OJ记录反推）
     std::cout << "\n[OJ分析] 完成" << std::endl;
 }
 
@@ -368,15 +368,32 @@ void ExamStatisticsSystem::saveData(const std::string& outputPath)
 }
 
 //系统主流程：按照拟定的顺序执行各个步骤
-//流程: 用户登录 → 加载数据 → 成绩计算 → 名单排序 → OJ分析
+//流程: 自动创建目录 → 用户登录 → 加载数据 → 成绩计算 → 名单排序 → OJ分析
 //       → 交互修改 → 可视化 → 数据扩充 → 保存导出
 void ExamStatisticsSystem::run(const std::string& dataDir, const std::string& outputDir)
 {
+    //0.自动创建所需目录（如不存在）
+    namespace fs = std::filesystem;
+    try {
+        if (!fs::exists(dataDir)) {
+            fs::create_directories(dataDir);
+            std::cout << "[初始化] 已创建数据目录: " << dataDir << std::endl;
+        }
+        if (!fs::exists(outputDir)) {
+            fs::create_directories(outputDir);
+            std::cout << "[初始化] 已创建输出目录: " << outputDir << std::endl;
+        }
+    }
+    catch (const fs::filesystem_error& e) {
+        throw std::runtime_error(
+            std::string("无法创建所需目录: ") + e.what());
+    }
+
     std::cout << "========================================" << std::endl;
     std::cout << "  期末成绩信息统计系统 v1.0" << std::endl;
     std::cout << "========================================" << std::endl;
 
-    //0.用户登录与权限验证
+    //1.用户登录与权限验证
     bool loggedIn = false;
     while (!loggedIn) {
         std::string username, passwd;
@@ -398,17 +415,17 @@ void ExamStatisticsSystem::run(const std::string& dataDir, const std::string& ou
     }
 
     try {
-        //1.加载数据
+        //2.加载数据
         loadData(dataDir);
 
-        //2.成绩计算
+        //3.成绩计算
         computeGrades();
 
-        //3.名单排序
+        //4.名单排序
         //默认按学号排序显示
         sortAndDisplay(0);
 
-        //4.OJ分析（用户可指定过题数阈值）
+        //5.OJ分析（用户可指定过题数阈值）
         std::cout << "\n请输入OJ过题数阈值(低于此值为不足，默认40): ";
         int threshold = 40;
         std::string thresholdInput;
@@ -419,7 +436,7 @@ void ExamStatisticsSystem::run(const std::string& dataDir, const std::string& ou
         }
         analyzeOJ(threshold);
 
-        //5.交互修改
+        //6.交互修改
         std::cout << "\n是否进入交互修改模式? (1=是, 0=跳过): ";
         std::string input;
         std::getline(std::cin, input);
@@ -427,10 +444,10 @@ void ExamStatisticsSystem::run(const std::string& dataDir, const std::string& ou
             findAndModify();
         }
 
-        //6.数据可视化
+        //7.数据可视化
         visualize(outputDir);
 
-        //7.数据扩充
+        //8.数据扩充
         std::cout << "\n是否进行数据扩充? (1=是, 0=跳过): ";
         std::string expandInput;
         std::getline(std::cin, expandInput);
@@ -438,7 +455,7 @@ void ExamStatisticsSystem::run(const std::string& dataDir, const std::string& ou
             augmentData(100);
         }
 
-        //8.保存导出
+        //9.保存导出
         std::string outputPath = outputDir + "/成绩总表_导出.xlsx";
         saveData(outputPath);
 

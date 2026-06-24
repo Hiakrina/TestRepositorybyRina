@@ -24,7 +24,7 @@ public:
     //mode: 0=按学号, 1=按班级, 2=按姓名
     void sortAndDisplay(int mode);
 
-    //OJ系统分析：输出过题不足、未在OJ、OJ多余三类名单
+    //OJ系统分析：输出过题不足、未在OJ两类名单
     //threshold:过题数阈值（如总题数10，阈值5表示<5为不足）
     void analyzeOJ(int threshold);
 

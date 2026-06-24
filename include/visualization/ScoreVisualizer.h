@@ -21,7 +21,7 @@ public:
         const std::string& outputPath);
 
 private:
-    //过滤出有效学生数据（成绩在0-100之间）
+    //过滤出有效学生（排除重修、缓考、旷考、取消资格）
     static std::vector<const CStudent*> filterValid(
         const std::vector<CStudent>& students);
 

@@ -2,7 +2,7 @@
 
     技术路线：
         main() 仅负责参数解析与启动程序。
-        创建 ExamStatisticsSystem 实例，传入数据文件路径，
+        创建 ExamStatisticsSystem 实例，传入数据目录及输出目录路径，
         调用系统主控类 run() 执行全部流程。
         程序结束前输出日志或错误提示，确保资源正常释放。
 
