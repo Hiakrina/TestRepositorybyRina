@@ -19,6 +19,7 @@
 
 #include <iostream>
 #include <string>
+#include <clocale>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -27,8 +28,12 @@
 int main(int argc, char* argv[])
 {
 #ifdef _WIN32
+    // 控制台 I/O 使用 UTF-8
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
+    // C 运行时文件 I/O 使用 UTF-8（修复含中文路径的文件创建失败问题）
+    // 需要 Windows 10 1903+，UCRT 支持 .utf8 locale
+    setlocale(LC_ALL, ".utf8");
 #endif
 
     //参数解析
