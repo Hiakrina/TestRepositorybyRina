@@ -2,10 +2,16 @@
 out/
 
 # IDE
-.vs/   （or others IDE files）
+.vs/
+.vs1/
 
 # vcpkg
-vcpkg_installed/   (may not exist if vcpkg is not used)
+vcpkg_installed/
+
+# 归档文件
+*.zip
+*.7z
+*.rar
 
 # 可执行文件与库
 *.exe

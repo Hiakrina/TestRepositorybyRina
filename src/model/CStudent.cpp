@@ -1,4 +1,4 @@
-#include"CStudent.h"
+#include "model/CStudent.h"
 #include <string>
     CStudent::CStudent(){}
     CStudent::CStudent(const std::string& id, const std::string& name, const std::string& clsbefore, const std::string& clsafter){
@@ -73,7 +73,7 @@
     }
 
     bool CStudent::isNormal() const{
-        return m_examStatus.empty();            //判断状态是否为空
+        return m_examStatus.empty() || m_examStatus == "初修";
     }
     bool CStudent::hasOJRecord() const{
         return m_ojSolved>=0;
