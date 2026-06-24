@@ -101,7 +101,7 @@
 三、项目结构
 ================================================================================
 
-期末成绩统计系统Beta/
+ExamStatisticsSystem_v1.0/
 +-- data/                                输入数据目录
 +-- output/                              输出结果目录
 +-- include/                             头文件
@@ -122,6 +122,7 @@
 |       +-- ScoreVisualizer.h            分数可视化
 +-- src/                                 源文件（与 include/ 对应）
 +-- CMakeLists.txt                       CMake 构建脚本
++-- CMakePresets.json                    CMake 预设（MSVC / MinGW / Debug / Release）
 +-- ExamStatisticsSystem.exe             可执行文件
 +-- ReadMe.txt                           本文件
 
@@ -135,10 +136,10 @@
 
   编译器        最低版本    Windows            Linux
   ------------------------------------------------------------------
-  MSVC          2022 (19)   Developer PS      不支持
-  MinGW-w64     GCC 11+    MSYS2 / cmd        (理论支持)
-  GCC           11+        (通过 MinGW)       需要 apt install
-  Clang         14+        LLVM / VS 附带     需要 apt install
+  MSVC          2022 (19)   Developer PS [推荐] 不支持
+  MinGW-w64     GCC 11+    MSYS2 / cmd (需重编译依赖)  不支持
+  GCC           11+        (通过 MinGW)        需要 apt install
+  Clang         14+        LLVM / VS 附带      需要 apt install
 
 【C++ 标准】C++17（OpenXLSX 库的要求）
 
@@ -149,6 +150,10 @@
   ------------------------------------------------------------------
   OpenXLSX        读写 xlsx    vcpkg install openxlsx
   libxlsxwriter   生成图表     vcpkg install libxlsxwriter
+
+  ⚠️ vcpkg 默认三元组 x64-windows 编译的库仅兼容 MSVC！
+     MinGW 用户必须使用 x64-mingw-dynamic 三元组（见下方 MinGW 构建步骤），
+     否则会出现 undefined reference to __imp__ZN8OpenXLSX... 链接错误。
 
   如果不使用 vcpkg 也可以手动编译上述库，放入 third_party/ 目录。
   Linux 用户可用系统包管理器：
@@ -165,43 +170,75 @@
   vcpkg      任意       包管理器（可选）
 
 
-【Windows — MSVC 构建步骤】
+【Windows — MSVC 构建步骤】★ 推荐
 
   :: 0. 安装 Visual Studio 2022（勾选"使用 C++ 的桌面开发"）
+  ::    安装 vcpkg 并集成：vcpkg integrate install
   :: 1. 打开 "Developer PowerShell for VS 2022"
-  cd 期末成绩统计系统Beta
+  cd ExamStatisticsSystem_v1.0
 
-  :: 2. 配置并构建 Debug
-  cmake -B out/build/x64-Debug -S . -G Ninja ^
-    -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake ^
-    -DCMAKE_BUILD_TYPE=Debug
-  cmake --build out/build/x64-Debug --config Debug
+  :: 2. 安装依赖（MSVC 默认三元组 x64-windows）
+  vcpkg install openxlsx libxlsxwriter
 
   :: 3. 配置并构建 Release（分发用）
-  cmake -B out/build/x64-Release -S . -G Ninja ^
-    -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake ^
+
+  :: 方式 A — 使用 CMakePresets（推荐）
+  cmake --preset msvc-release
+  cmake --build out/build/msvc-Release
+
+  :: 方式 B — 手动指定参数
+  cmake -B out/build/msvc-Release -S . -G Ninja `
+    -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
     -DCMAKE_BUILD_TYPE=Release
-  cmake --build out/build/x64-Release --config Release
+  cmake --build out/build/msvc-Release --config Release
+
+  :: 生成的 EXE 在 out/build/msvc-Release/ExamStatisticsSystem.exe
+  :: 运行时 DLL 由 vcpkg 自动处理（或从 vcpkg_installed 目录复制）
 
   :: 不使用 vcpkg 时去掉 -DCMAKE_TOOLCHAIN_FILE 参数，手动指定库路径。
 
 
 【Windows — MinGW-w64 构建步骤】
 
-  :: 0. 安装 MSYS2，然后安装工具链：
-  pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake ^
+  ⚠️ 重要：默认 vcpkg 库是 MSVC ABI，MinGW 无法链接！
+     必须使用 x64-mingw-dynamic 三元组重编译依赖。
+
+  :: 方案 A — vcpkg + MinGW 三元组（推荐）
+
+  :: 0. 安装 MSYS2 和 vcpkg
+  :: 1. 在 MSYS2 MinGW64 终端中安装工具链：
+  pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake \
     mingw-w64-x86_64-ninja
 
-  :: 1. 在 MSYS2 MinGW64 终端中：
-  cd 期末成绩统计系统Beta
+  :: 2. 为 MinGW 编译依赖（耗时约 10-30 分钟）
+  vcpkg install openxlsx:x64-mingw-dynamic libxlsxwriter:x64-mingw-dynamic
 
-  :: 2. 编译 OpenXLSX 和 libxlsxwriter 后放入 third_party/，
-  ::    或使用 vcpkg 的 x64-mingw 三元组。
+  :: 3. 配置并构建
+  cd ExamStatisticsSystem_v1.0
 
+  :: 方式 A — 使用 CMakePresets（推荐，自动设置 triplet）
+  cmake --preset mingw-release
+  cmake --build out/build/mingw-Release
+
+  :: 方式 B — 手动指定参数
+  cmake -B out/build/mingw-Release -S . -G Ninja \
+    -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake \
+    -DVCPKG_TARGET_TRIPLET=x64-mingw-dynamic \
+    -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++
+  cmake --build out/build/mingw-Release
+
+  :: 注意：CMakeLists.txt 会自动检测 MinGW 编译器并补全 vcpkg
+  ::       x64-mingw-dynamic 版 libxlsxwriter 可能缺失的
+  ::       third_party/ 头文件（从 x64-windows 版本复制）。
+
+  :: 方案 B — 手动编译依赖放入 third_party/
+
+  :: 1. 用 MinGW 编译器从 GitHub 克隆并编译 OpenXLSX 和 libxlsxwriter
+  :: 2. 编译产物（.dll + .a / .lib）放入 third_party/ 对应目录
   :: 3. 构建
-  cmake -B out/build/mingw-Release -S . -G Ninja ^
-    -DCMAKE_BUILD_TYPE=Release ^
-    -DOPENXLSX_ROOT=./third_party/OpenXLSX ^
+  cmake -B out/build/mingw-Release -S . -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DOPENXLSX_ROOT=./third_party/OpenXLSX \
     -DXLSXWRITER_ROOT=./third_party/libxlsxwriter
   cmake --build out/build/mingw-Release
 
@@ -210,11 +247,11 @@
 
   sudo apt install cmake ninja-build g++ libxlsxwriter-dev
 
-  cd 期末成绩统计系统Beta
+  cd ExamStatisticsSystem_v1.0
 
   :: 编译 OpenXLSX 放入 third_party/，然后：
-  cmake -B out/build/linux-Release -S . -G Ninja ^
-    -DCMAKE_BUILD_TYPE=Release ^
+  cmake -B out/build/linux-Release -S . -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
     -DOPENXLSX_ROOT=./third_party/OpenXLSX
   cmake --build out/build/linux-Release
 
@@ -374,6 +411,12 @@ A: v1.0.1 起程序会自动创建 data/ 和 output/ 目录。
    但 4 个 Excel 数据文件仍需手动放入 data/。
    若自动创建失败请确保程序在全英文文路径下运行，并检查程序给出的错误提示。
    
+
+Q: MinGW 链接报 undefined reference to __imp__ZN8OpenXLSX...？
+A: vcpkg 默认安装 MSVC ABI 版本的库，MinGW 无法链接。
+   请为 MinGW 重编译依赖：
+     vcpkg install openxlsx:x64-mingw-dynamic libxlsxwriter:x64-mingw-dynamic
+   详见第四章 MinGW 构建步骤。
 
 Q: 能用 GCC / MinGW / Clang 编译吗？
 A: 可以。项目代码本身跨平台（#ifdef _WIN32 隔离）。

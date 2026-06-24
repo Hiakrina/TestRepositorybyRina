@@ -14,6 +14,33 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # ============================================================
 # 第三方库配置
 # ============================================================
+# 本项目的第三方库通过 vcpkg 管理。
+# 构建前请确保已安装 vcpkg 并配置所需包：
+#
+#   【MSVC 用户】
+#     vcpkg install openxlsx:x64-windows libxlsxwriter:x64-windows
+#     cmake -S . -B out/build/msvc-Release -G "Ninja" ^
+#           -DCMAKE_BUILD_TYPE=Release ^
+#           -DCMAKE_TOOLCHAIN_FILE=<vcpkg_root>/scripts/buildsystems/vcpkg.cmake
+#
+#   【MinGW 用户】
+#     vcpkg install openxlsx:x64-mingw-dynamic libxlsxwriter:x64-mingw-dynamic
+#     cmake -S . -B out/build/mingw-Release -G "Ninja" ^
+#           -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ ^
+#           -DCMAKE_TOOLCHAIN_FILE=<vcpkg_root>/scripts/buildsystems/vcpkg.cmake ^
+#           -DVCPKG_TARGET_TRIPLET=x64-mingw-dynamic
+#
+#   也可使用 CMakePresets.json 中的预设简化配置。
+# ============================================================
+
+# 自动检测编译器类型，推断 vcpkg triplet
+if(NOT DEFINED VCPKG_TARGET_TRIPLET)
+    if(MSVC)
+        set(VCPKG_TARGET_TRIPLET "x64-windows" CACHE STRING "vcpkg target triplet")
+    elseif(MINGW)
+        set(VCPKG_TARGET_TRIPLET "x64-mingw-dynamic" CACHE STRING "vcpkg target triplet")
+    endif()
+endif()
 
 # OpenXLSX 库路径（请根据实际安装位置修改）
 set(OPENXLSX_ROOT "${CMAKE_SOURCE_DIR}/third_party/OpenXLSX" CACHE PATH "OpenXLSX 安装根目录")
@@ -23,10 +50,10 @@ if(EXISTS "${OPENXLSX_ROOT}")
     set(OpenXLSX_DIR "${OPENXLSX_ROOT}/lib/cmake/OpenXLSX")
     find_package(OpenXLSX REQUIRED)
 else()
-    # 如果 OpenXLSX 未安装到 third_party，尝试系统查找
+    # 如果 OpenXLSX 未安装到 third_party，尝试 vcpkg / 系统查找
     find_package(OpenXLSX QUIET)
     if(NOT OpenXLSX_FOUND)
-        message(WARNING "未找到 OpenXLSX 库，请将 OpenXLSX 安装到 third_party/OpenXLSX 或设置 OPENXLSX_ROOT")
+        message(WARNING "未找到 OpenXLSX 库，请将 OpenXLSX 安装到 third_party/OpenXLSX 或通过 vcpkg 安装")
     endif()
 endif()
 
@@ -37,8 +64,11 @@ endif()
 # 提供以下三种安装方式（任选其一）：
 #
 # 方式一 [推荐]：用 vcpkg 安装（自动处理 zlib 依赖）
-#   vcpkg install libxlsxwriter:x64-windows
+#   MSVC:  vcpkg install libxlsxwriter:x64-windows
+#   MinGW: vcpkg install libxlsxwriter:x64-mingw-dynamic
 #   CMake 命令行添加: -DCMAKE_TOOLCHAIN_FILE=<vcpkg_root>/scripts/buildsystems/vcpkg.cmake
+#   注意：vcpkg 的 x64-mingw-dynamic 版 libxlsxwriter 可能缺少 third_party/ 头文件，
+#         本脚本会在配置阶段自动从 x64-windows 版本补全。
 #
 # 方式二：手动编译后放入 third_party/libxlsxwriter/
 #   1. git clone https://github.com/jmcnamara/libxlsxwriter.git
@@ -100,9 +130,45 @@ else()
     if(NOT XLSXWRITER_FOUND)
         message(WARNING "未找到 libxlsxwriter 库！图表功能将不可用。")
         message(WARNING "请选择以下方式之一安装：")
-        message(WARNING "  1. vcpkg install libxlsxwriter:x64-windows")
+        message(WARNING "  1. MSVC:  vcpkg install libxlsxwriter:x64-windows")
+        message(WARNING "     MinGW: vcpkg install libxlsxwriter:x64-mingw-dynamic")
         message(WARNING "  2. 手动编译放入 third_party/libxlsxwriter/")
         message(WARNING "  3. sudo apt install libxlsxwriter-dev (Linux)")
+    endif()
+endif()
+
+# ============================================================
+# 修复 vcpkg x64-mingw-dynamic 版 libxlsxwriter 缺少 third_party/ 头文件
+# ============================================================
+# 背景：vcpkg 的 x64-mingw-dynamic 版 libxlsxwriter 在安装时可能未包含
+# third_party/queue.h、tree.h 等必需头文件，导致 MinGW 构建失败。
+# 作为临时修复，从 x64-windows 版本复制缺失的头文件。
+if(MINGW AND XLSXWRITER_FOUND AND XLSXWRITER_INCLUDE_DIR)
+    set(_LXW_THIRD_PARTY_DST "${XLSXWRITER_INCLUDE_DIR}/third_party")
+    if(NOT EXISTS "${_LXW_THIRD_PARTY_DST}/queue.h")
+        # 尝试在 vcpkg 安装目录中寻找 x64-windows 版本的 third_party
+        if(DEFINED VCPKG_INSTALLED_DIR)
+            set(_LXW_MSVC_TP "${VCPKG_INSTALLED_DIR}/../x64-windows/include/xlsxwriter/third_party")
+        else()
+            # 从 CMAKE_TOOLCHAIN_FILE 推断 vcpkg 根目录
+            get_filename_component(_VCPKG_SCRIPTS "${CMAKE_TOOLCHAIN_FILE}" DIRECTORY)
+            get_filename_component(_VCPKG_ROOT "${_VCPKG_SCRIPTS}" DIRECTORY)
+            set(_LXW_MSVC_TP "${_VCPKG_ROOT}/installed/x64-windows/include/xlsxwriter/third_party")
+        endif()
+        if(EXISTS "${_LXW_MSVC_TP}/queue.h")
+            message(STATUS "从 ${_LXW_MSVC_TP} 补全缺失的 libxlsxwriter third_party/ 头文件")
+            file(COPY "${_LXW_MSVC_TP}" DESTINATION "${XLSXWRITER_INCLUDE_DIR}")
+        else()
+            # 最后尝试常见的 vcpkg 默认安装路径
+            set(_LXW_MSVC_TP_FB "C:/vcpkg/installed/x64-windows/include/xlsxwriter/third_party")
+            if(EXISTS "${_LXW_MSVC_TP_FB}/queue.h")
+                message(STATUS "从 ${_LXW_MSVC_TP_FB} 补全缺失的 libxlsxwriter third_party/ 头文件")
+                file(COPY "${_LXW_MSVC_TP_FB}" DESTINATION "${XLSXWRITER_INCLUDE_DIR}")
+            else()
+                message(WARNING "libxlsxwriter 缺少 third_party/queue.h 等头文件！")
+                message(WARNING "请尝试: vcpkg install libxlsxwriter:x64-windows 后重新配置")
+            endif()
+        endif()
     endif()
 endif()
 
