@@ -1,0 +1,21 @@
+# 构建输出
+out/
+
+# IDE
+.vs/   （or others IDE files）
+
+# vcpkg
+vcpkg_installed/   (may not exist if vcpkg is not used)
+
+# 可执行文件与库
+*.exe
+*.dll
+
+# Ninja 构建
+build.ninja
+.ninja_*
+CMakeCache.txt
+cmake_install.cmake
+
+# 输出
+output/
