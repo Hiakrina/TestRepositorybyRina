@@ -369,7 +369,8 @@ void ExamStatisticsSystem::saveData(const std::string& outputPath)
 
 //系统主流程：按照拟定的顺序执行各个步骤
 //流程: 自动创建目录 → 用户登录 → 加载数据 → 成绩计算 → 名单排序 → OJ分析
-//      → [循环: 交互修改(若已扩充则先展示新数据) → 可视化 → 数据扩充? → (若扩充则回到修改)] → 保存导出
+//      → [循环: 交互修改(若已扩充则先展示新数据) → 数据扩充? → (若扩充则回到修改)]
+//      → 可视化 → 保存导出
 //学生用户OJ分析使用默认阈值40，教师和管理员可自定义阈值
 void ExamStatisticsSystem::run(const std::string& dataDir, const std::string& outputDir)
 {
@@ -444,11 +445,13 @@ void ExamStatisticsSystem::run(const std::string& dataDir, const std::string& ou
         }
         analyzeOJ(threshold);
 
-        //6.交互修改（可循环：修改 → 可视化 → 扩充 → 返回修改）
+        //6.修改-扩充循环：修改 → 询问扩充 → 若扩充则回到修改 → 不再修改扩充时退出
         //若数据已扩充，进入修改前先展示新增学生以供参考
+        //可视化在循环外，确认不再修改和扩充后统一生成
         bool continueMainLoop = true;
         size_t countBeforeExpand = students.size();
         while (continueMainLoop) {
+            //6.交互修改
             std::cout << "\n是否进入交互修改模式? (1=是, 0=跳过): ";
             std::string input;
             std::getline(std::cin, input);
@@ -468,11 +471,8 @@ void ExamStatisticsSystem::run(const std::string& dataDir, const std::string& ou
                 findAndModify();
             }
 
-            //7.数据可视化
-            visualize(outputDir);
-
-            //8.数据扩充（扩充后返回修改界面，允许对新数据继续操作）
-            std::cout << "\n是否进行数据扩充? (1=是, 0=跳过, 直接保存): ";
+            //7.数据扩充（修改后询问；若扩充则回到循环起点继续修改，否则退出）
+            std::cout << "\n是否进行数据扩充? (1=是, 0=跳过, 进入可视化): ";
             std::string expandInput;
             std::getline(std::cin, expandInput);
             if (expandInput == "1") {
@@ -481,10 +481,14 @@ void ExamStatisticsSystem::run(const std::string& dataDir, const std::string& ou
                 std::cout << "\n[流程] 数据已扩充，新增 "
                           << (students.size() - countBeforeExpand)
                           << " 人，返回修改界面..." << std::endl;
+                // 继续循环，回到修改界面
             } else {
-                continueMainLoop = false;   // 退出循环，进入保存
+                continueMainLoop = false;   // 不再修改和扩充，退出循环
             }
         }
+
+        //8.数据可视化（确认不再修改和扩充后，统一生成图表）
+        visualize(outputDir);
 
         //9.保存导出
         std::string outputPath = outputDir + "/成绩总表_导出.xlsx";

@@ -25,3 +25,12 @@ cmake_install.cmake
 
 # 输出
 output/
+
+# Office 临时文件
+~$*
+
+# 文档（不上传）
+docs/
+
+# 数据文件（不上传）
+data/

@@ -78,7 +78,7 @@
     }
 
     bool CStudent::isNormal() const{
-        return m_examStatus.empty();            //判断状态是否为空
+        return !m_excluded;                      //排除标记由解析时根据考试状态(重修/缓考/旷考等)设置
     }
     bool CStudent::hasOJRecord() const{
         return m_ojSolved>=0;
