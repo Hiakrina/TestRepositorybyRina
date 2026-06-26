@@ -28,7 +28,7 @@
 
 【第 1 步】获取程序
   从 GitHub Releases 页面下载最新版本：
-    https://github.com/Hiakrina/TestRepositorybyRina
+    https://github.com/Hiakrina/ExamStatisticsSystem
 
   下载后解压。程序首次运行时会自动创建 data/ 和 output/ 目录，
   你只需在 data/ 中放入以下 4 个 Excel 文件（格式参考"六、数据文件格式"）：
